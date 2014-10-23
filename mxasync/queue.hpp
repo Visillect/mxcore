@@ -48,7 +48,7 @@ public:
   {
     boost::lock_guard<boost::mutex> lock(_mutex);
     _queue.push_back(x);
-    _notEmptyCondvar.notify_all();
+    _notEmptyCondvar.notify_one();
   }
 
   T pop()
