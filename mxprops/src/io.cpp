@@ -28,13 +28,12 @@ static void add_prop_line(mxprops::PTree::Ref const& dst,
   dst.set(namePart, valuePart);
 }
 
-MXPROPS_API
 bool load_from_command_line(mxprops::PTree::Ref const& dst,
                             std::vector<std::string> & messages,
-                            int argc, 
+                            int argc,
                             char const* argv[])
 {
-  try 
+  try
   {
     for (int i = 1; i < argc; ++i)
     {
@@ -58,9 +57,8 @@ bool load_from_command_line(mxprops::PTree::Ref const& dst,
   }
 }
 
-MXPROPS_API
 bool load_from_json(mxprops::PTree::Ref const& dst,
-                    std::vector<std::string> & messages, 
+                    std::vector<std::string> & messages,
                     Json::Value const& doc)
 {
   std::vector<std::string> members = doc.getMemberNames();
@@ -114,9 +112,8 @@ bool load_from_json(mxprops::PTree::Ref const& dst,
 }
 
 
-MXPROPS_API
 bool load_from_json_file(mxprops::PTree::Ref const& dst,
-                         std::vector<std::string> & messages, 
+                         std::vector<std::string> & messages,
                          std::string const& filename)
 {
   Json::Reader reader;
@@ -131,5 +128,25 @@ bool load_from_json_file(mxprops::PTree::Ref const& dst,
   return load_from_json(dst, messages, doc);
 }
 
+void init_settings_from_command_line(mxprops::PTree::Ref const& dst,
+                                     int argc,
+                                     char const* argv[])
+{
+  std::vector<std::string> messages;
+
+  for (int i = 1; i < argc; ++i)
+  {
+    if (argv[i][0] == '-')
+    {
+      add_prop_line(dst, argv[i] + 1);
+    }
+    else if (!load_from_json_file(dst, messages, argv[i]))
+    {
+      std::ostringstream oss;
+      oss << "unknown arg #" << i << ": '" << argv[i] << "'";
+      throw std::runtime_error(oss.str());
+    }
+  }
+}
 
 }

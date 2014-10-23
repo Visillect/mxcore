@@ -2,15 +2,13 @@ project(mxprops)
 
 find_boost_libs(thread system)
 
-add_library(mxprops SHARED
+add_library(mxprops STATIC
   mxprops.h
-  io.h
   pathprop.h
-  src/mxprops.cpp
+  io.h
   src/io.cpp
 )
 
 target_link_libraries(mxprops
   ${Boost_LIBRARIES}
-  jsoncpp
 )

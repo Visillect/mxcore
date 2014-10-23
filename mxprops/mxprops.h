@@ -30,17 +30,6 @@ either expressed or implied, of copyright holders.
 
 #pragma once
 
-#if defined(_MSC_VER)
-# if defined(MXPROPS_EXPORTS)
-#  define MXPROPS_API __declspec(dllexport)
-# else
-#  define MXPROPS_API __declspec(dllimport)
-# endif
-#else
-# define MXPROPS_API
-#endif
-
-
 #include <cassert>
 #include <boost/noncopyable.hpp>
 #include <boost/lexical_cast.hpp>
@@ -53,11 +42,25 @@ either expressed or implied, of copyright holders.
 #include <map>
 #include <utility>
 #include <mxprops/pathprop.h>
-
+#include <mxlog/mxlog.h>
 
 namespace mxprops {
 
-MXPROPS_API void _doNothing();
+class PropsError : public std::runtime_error
+{
+public:
+  PropsError(std::string const& propertyName, std::string const& msg)
+  : std::runtime_error(msg + propertyName),
+    propertyName(propertyName)
+  { }
+
+  ~PropsError() throw() { }
+
+  char const* getPropertyName() const { return propertyName.c_str(); }
+
+private:
+  std::string propertyName;
+};
 
 class PTree : private boost::noncopyable
 {
@@ -70,24 +73,27 @@ public:
     { }
 
     std::string const& getValue() const { return value; }
-    
+
     void setValue(std::string const& v)
     {
       value = v;
       defined = true;
     }
-    
+
     void setValue(std::string const& v, PathPropData const& pd)
     {
       setValue(v);
-      pathData = pd; 
+      pathData = pd;
     }
 
     bool isDefined() const { return defined; }
 
     template <typename TData>
-    boost::optional<TData> get_as() const
+    boost::optional<TData> get_as(bool *getDefined = 0) const
     {
+      if (getDefined)
+        *getDefined = defined;
+
       if (!defined)
         return boost::optional<TData>();
       typedef typename boost::property_tree::translator_between<std::string, TData>::type Tr;
@@ -126,7 +132,7 @@ public:
   class Ref;
   class ConstRef;
 
-  ConstRef root(const std::string &id) const;  
+  ConstRef root(const std::string &id) const;
   Ref      root(const std::string &id);
 
   static std::string joinPaths(const std::string &p1, const std::string &p2)
@@ -180,6 +186,8 @@ public:
   : owner(0)
   { }
 
+  bool hasOwner() const { return owner != 0; }
+
   std::string getSelfPath() const { return selfPath; }
 
   PTree::Record getRecord(const std::string &path) const
@@ -198,11 +206,21 @@ public:
   }
 
   template <typename TData>
-  boost::optional<TData> get(const std::string &path) const
+  boost::optional<TData> getOptional(const std::string &path, bool *getDefined = 0) const
   {
     assert(owner);
     boost::unique_lock<boost::mutex> g(owner->mutex);
-    return getRecord(path).get_as<TData>();
+    return getRecord(path).get_as<TData>(getDefined);
+  }
+
+  template <typename TData>
+  TData get(const std::string &path) const
+  {
+    bool isDefined = false;
+    boost::optional<TData> const v = getOptional<TData>(path, &isDefined);
+    if (!v)
+      throw PropsError(getSelfPath() + "." + path, isDefined ? "Bad format " : "Undefined property: ");
+    return *v;
   }
 
   template <typename TData>
@@ -214,7 +232,7 @@ public:
   template <typename TData>
   boost::optional<TData> getValue() const
   {
-    return get<TData>("");
+    return getOptional<TData>("");
   }
 
   void listKeysRecursive(std::vector<std::string> & result, bool withUndefined = false) const
@@ -238,7 +256,12 @@ public:
       while (it != pm.end() && boost::starts_with(it->first, selfPath))
       {
         if (withUndefined || it->second.isDefined())
-          result.push_back(it->first.substr(selfPath.size() + 1)); // to remove the path separator
+        {
+          if (selfPath == it->first)
+            result.push_back("");
+          else
+            result.push_back(it->first.substr(selfPath.size() + 1)); // to remove the path separator
+        }
         ++it;
       }
     }
@@ -296,7 +319,7 @@ protected:
   }
 
   friend class PTree;
-  
+
   // using pointers instead of smart pointers for the time being
   // to think less about the underlying data structure
   // (shared_ptr-s to internal nodes would be best, but that requires
@@ -326,7 +349,7 @@ public:
     assert(owner);
     boost::lock_guard<boost::mutex> g(owner->mutex);
     owner->getRecord(PTree::joinPaths(selfPath, path)) = r;
-  }  
+  }
 
   template <typename TData>
   void set(const std::string &path, const TData &value) const
@@ -343,7 +366,7 @@ public:
     assert(owner);
     boost::lock_guard<boost::mutex> g(owner->mutex);
     owner->getRecord(PTree::joinPaths(selfPath, path)).undefine();
-  }  
+  }
 
   template <typename TData>
   void setValue(const TData &value) const
