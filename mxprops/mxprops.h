@@ -42,7 +42,6 @@ either expressed or implied, of copyright holders.
 #include <map>
 #include <utility>
 #include <mxprops/pathprop.h>
-#include <mxlog/mxlog.h>
 
 namespace mxprops {
 
