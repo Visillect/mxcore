@@ -410,7 +410,7 @@ protected:
 
 inline PTree::ConstRef PTree::root(const std::string &id) const
 {
-  return const_cast<PTree const*>(this)->root(id);
+  return const_cast<PTree *>(this)->root(id);
 }
 
 inline PTree::Ref PTree::root(const std::string &id)
